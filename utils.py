@@ -1,3 +1,7 @@
+"""
+Utility functions and helpers for Enhanced R-Search Framework.
+"""
+
 import re
 import json
 import pickle
@@ -125,4 +129,193 @@ class IOManager:
         """Save data to JSON file."""
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=indent, ensure_ascii=False
+                json.dump(data, f, indent=indent, ensure_ascii=False)
+            logger.info(f"Data saved to {filepath}")
+        except Exception as e:
+            logger.error(f"Failed to save JSON to {filepath}: {e}")
+            raise
+    
+    @staticmethod
+    def load_json(filepath: str) -> Any:
+        """Load data from JSON file."""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            logger.info(f"Data loaded from {filepath}")
+            return data
+        except Exception as e:
+            logger.error(f"Failed to load JSON from {filepath}: {e}")
+            raise
+    
+    @staticmethod
+    def save_pickle(data: Any, filepath: str):
+        """Save data to pickle file."""
+        try:
+            with open(filepath, 'wb') as f:
+                pickle.dump(data, f)
+            logger.info(f"Data saved to {filepath}")
+        except Exception as e:
+            logger.error(f"Failed to save pickle to {filepath}: {e}")
+            raise
+    
+    @staticmethod
+    def load_pickle(filepath: str) -> Any:
+        """Load data from pickle file."""
+        try:
+            with open(filepath, 'rb') as f:
+                data = pickle.load(f)
+            logger.info(f"Data loaded from {filepath}")
+            return data
+        except Exception as e:
+            logger.error(f"Failed to load pickle from {filepath}: {e}")
+            raise
+    
+    @staticmethod
+    def ensure_directory(filepath: str):
+        """Ensure directory exists for the given filepath."""
+        directory = Path(filepath).parent
+        directory.mkdir(parents=True, exist_ok=True)
+
+
+class LoggingManager:
+    """Logging configuration and management."""
+    
+    @staticmethod
+    def setup_logging(level: str = "INFO", log_file: str = None):
+        """Setup logging configuration."""
+        log_level = getattr(logging, level.upper(), logging.INFO)
+        
+        # Create formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        
+        # Setup console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+        console_handler.setFormatter(formatter)
+        
+        # Setup root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level)
+        root_logger.addHandler(console_handler)
+        
+        # Setup file handler if specified
+        if log_file:
+            IOManager.ensure_directory(log_file)
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(log_level)
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
+        
+        logger.info(f"Logging setup complete - Level: {level}")
+
+
+class VisualizationUtils:
+    """Utilities for visualizing reasoning processes."""
+    
+    @staticmethod
+    def create_reasoning_tree_diagram(tree_nodes: Dict, output_path: str = None):
+        """Create a diagram of the reasoning tree."""
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.patches as patches
+            from matplotlib.patches import FancyBboxPatch
+        except ImportError:
+            logger.warning("Matplotlib not available for visualization")
+            return None
+        
+        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+        
+        # Simple tree layout
+        levels = {}
+        for node_id, node in tree_nodes.items():
+            depth = node.depth
+            if depth not in levels:
+                levels[depth] = []
+            levels[depth].append((node_id, node))
+        
+        # Draw nodes
+        y_positions = {}
+        for depth, nodes in levels.items():
+            y = len(levels) - depth - 1
+            for i, (node_id, node) in enumerate(nodes):
+                x = i * 2
+                y_positions[node_id] = (x, y)
+                
+                # Color based on score
+                color = 'lightgreen' if node.score > 0.7 else 'lightcoral' if node.score < 0.3 else 'lightblue'
+                
+                # Draw node
+                box = FancyBboxPatch((x-0.4, y-0.2), 0.8, 0.4, 
+                                   boxstyle="round,pad=0.02", 
+                                   facecolor=color, edgecolor='black')
+                ax.add_patch(box)
+                
+                # Add text
+                short_content = node.content[:20] + "..." if len(node.content) > 20 else node.content
+                ax.text(x, y, short_content, ha='center', va='center', fontsize=8, wrap=True)
+        
+        # Draw edges
+        for node_id, node in tree_nodes.items():
+            if node.parent_id and node.parent_id in y_positions:
+                parent_pos = y_positions[node.parent_id]
+                child_pos = y_positions[node_id]
+                ax.plot([parent_pos[0], child_pos[0]], [parent_pos[1], child_pos[1]], 
+                       'k-', alpha=0.6)
+        
+        ax.set_xlim(-1, max([pos[0] for pos in y_positions.values()]) + 1)
+        ax.set_ylim(-0.5, len(levels) - 0.5)
+        ax.set_aspect('equal')
+        ax.axis('off')
+        ax.set_title('Reasoning Tree Visualization')
+        
+        if output_path:
+            IOManager.ensure_directory(output_path)
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Tree diagram saved to {output_path}")
+        
+        return fig
+    
+    @staticmethod
+    def plot_reward_trends(reward_history: List[Dict], output_path: str = None):
+        """Plot reward trends over time."""
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            logger.warning("Matplotlib not available for visualization")
+            return None
+        
+        if not reward_history:
+            logger.warning("No reward history to plot")
+            return None
+        
+        # Extract reward components
+        episodes = list(range(len(reward_history)))
+        
+        reward_types = ['answer_reward', 'evidence_reward', 'consistency_reward', 
+                       'novelty_reward', 'efficiency_reward', 'total_reward']
+        
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        axes = axes.flatten()
+        
+        for i, reward_type in enumerate(reward_types):
+            if i < len(axes):
+                values = [episode.get(reward_type, 0) for episode in reward_history]
+                axes[i].plot(episodes, values, linewidth=2)
+                axes[i].set_title(reward_type.replace('_', ' ').title())
+                axes[i].set_xlabel('Episode')
+                axes[i].set_ylabel('Reward')
+                axes[i].grid(True, alpha=0.3)
+                
+                # Add trend line
+                if len(values) > 1:
+                    z = np.polyfit(episodes, values, 1)
+                    p = np.poly1d(z)
+                    axes[i].plot(episodes, p(episodes), "r--", alpha=0.8, linewidth=1)
+        
+        plt.tight_layout()
+        
+        if output_path:
+            IOManager.ensure_directory(output_path)
+            plt.savefi
