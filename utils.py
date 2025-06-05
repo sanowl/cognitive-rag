@@ -9,6 +9,7 @@ import logging
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
+import fickling
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +164,7 @@ class IOManager:
         """Load data from pickle file."""
         try:
             with open(filepath, 'rb') as f:
-                data = pickle.load(f)
+                data = fickling.load(f)
             logger.info(f"Data loaded from {filepath}")
             return data
         except Exception as e:
