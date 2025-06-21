@@ -1,9 +1,9 @@
 import re
 import time
-import random
 import numpy as np
 from typing import Dict, List, Optional, Set
 from .config import ThoughtNode, ReasoningState, AgentRole, EnhancedRSearchConfig
+import secrets
 
 
 class TreeOfThoughts:
@@ -128,7 +128,7 @@ class TreeOfThoughts:
                                  if cid in self.nodes and self.nodes[cid].score > self.config.pruning_threshold]
             
             if unexplored_children:
-                return random.choice(unexplored_children)
+                return secrets.choice(unexplored_children)
         
         return None
     
